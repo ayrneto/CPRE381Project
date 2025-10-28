@@ -2,39 +2,75 @@ library IEEE;
 use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
+-- Logical right shifts (SRL) shift zeros into the MSB, arithmetic right shifts (SRA)
+-- copy the sign bit so the signed value is preserved. RISC-V omits SLA because
+-- logical left (SLL) already performs the same transform for both signed/unsigned.
+
 entity BarrelShifter is
     port (
         i_Data     : in  std_logic_vector(31 downto 0);
         i_ShiftAmt : in  std_logic_vector(4 downto 0);
-        i_Dir      : in  std_logic; -- '0' = left, '1' = right
-        i_Arith    : in  std_logic; -- only matters when shifting right
+        i_Mode     : in  std_logic_vector(3 downto 0); -- reuse ALUControl codes
         o_Result   : out std_logic_vector(31 downto 0)
     );
 end BarrelShifter;
 
-architecture Behavioral of BarrelShifter is
-begin
-    process(i_Data, i_ShiftAmt, i_Dir, i_Arith)
-        variable data     : std_logic_vector(31 downto 0);
-        variable shifted  : std_logic_vector(31 downto 0);
-        variable amount   : integer range 0 to 31;
-        variable fill_bit : std_logic;
+architecture Structural of BarrelShifter is
+
+    -- Match the ALU control encodings defined in ControlUnit.vhd / ALU.
+    constant ALU_SLL : std_logic_vector(3 downto 0) := "0101";
+    constant ALU_SRL : std_logic_vector(3 downto 0) := "0110";
+    constant ALU_SRA : std_logic_vector(3 downto 0) := "0111";
+
+    type stage_array is array (0 to 5) of std_logic_vector(31 downto 0);
+
+    signal s_before  : std_logic_vector(31 downto 0);
+    signal s_stage   : stage_array;
+    signal s_after   : std_logic_vector(31 downto 0);
+    signal s_is_left : std_logic;
+    signal s_is_arith: std_logic;
+    signal s_fill    : std_logic;
+
+    -- Bit reversal lets the same right-shift network implement left shifts.
+    function reverse_bits(d : std_logic_vector(31 downto 0)) return std_logic_vector is
+        variable result : std_logic_vector(31 downto 0);
     begin
-        data := i_Data;
-        amount := to_integer(unsigned(i_ShiftAmt));
+        for i in 0 to 31 loop
+            result(i) := d(31 - i);
+        end loop;
+        return result;
+    end function;
 
-        if i_Dir = '0' then  -- Shift Left
-            shifted := std_logic_vector(shift_left(unsigned(data), amount));
-        else                 -- Shift Right
-            if i_Arith = '1' then
-                fill_bit := data(31); -- sign extension
-                shifted := std_logic_vector(shift_right(signed(data), amount));
-            else
-                shifted := std_logic_vector(shift_right(unsigned(data), amount));
-            end if;
-        end if;
+begin
+    -- Decode the requested shift mode from the ALUControl word.
+    s_is_left  <= '1' when i_Mode = ALU_SLL else '0';
+    s_is_arith <= '1' when i_Mode = ALU_SRA else '0';
 
-        o_Result <= shifted;
-    end process;
-end Behavioral;
+    -- Feed left shifts through a reversed bit order so the mux tree stays identical.
+    s_before    <= reverse_bits(i_Data) when s_is_left = '1' else i_Data;
+    s_stage(0)  <= s_before;
+    -- Arithmetic right shifts replicate the sign bit, logical shifts zero-fill.
+    s_fill      <= i_Data(31) when (s_is_left = '0' and s_is_arith = '1') else '0';
+
+    -- Cascaded 2:1 multiplexers implement shifts by 1, 2, 4, 8, and 16 bits.
+    stage_gen : for stage in 0 to 4 generate
+        constant STEP : integer := 2**stage;
+    begin
+        lower_bits : for bit in 0 to 31 - STEP generate
+        begin
+            s_stage(stage + 1)(bit) <= s_stage(stage)(bit) when i_ShiftAmt(stage) = '0'
+                else s_stage(stage)(bit + STEP);
+        end generate;
+
+        upper_bits : for bit in 32 - STEP to 31 generate
+        begin
+            s_stage(stage + 1)(bit) <= s_stage(stage)(bit) when i_ShiftAmt(stage) = '0'
+                else s_fill;
+        end generate;
+    end generate;
+
+    s_after  <= s_stage(5);
+    o_Result <= reverse_bits(s_after) when s_is_left = '1' else s_after;
+
+end Structural;
 
