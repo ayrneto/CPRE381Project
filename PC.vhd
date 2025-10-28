@@ -1,6 +1,7 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
 
+-- Ayr Nasser Neto
 -- PC (Program Counter): A register, that has Write Enable always on and holds the value of the next instruction's address as input, and outputs the current address
 entity PC is
     port(i_CLK	: in std_logic;

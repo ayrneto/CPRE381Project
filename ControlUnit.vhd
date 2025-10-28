@@ -16,7 +16,7 @@ entity ControlUnit is
         o_AndLink    : out std_logic;
         o_ALUSrc     : out std_logic;
         o_RegWrite   : out std_logic;
-        o_ImmType    : out std_logic_vector(1 downto 0);
+        o_ImmType    : out std_logic_vector(2 downto 0);
         o_ALUControl : out std_logic_vector(3 downto 0)
     );
 end ControlUnit;
@@ -49,7 +49,7 @@ begin
         o_AndLink    <= '0';
         o_ALUSrc     <= '0';
         o_RegWrite   <= '0';
-        o_ImmType    <= "00";
+        o_ImmType    <= "000";
         o_ALUControl <= ALU_ADD;
 
         case i_Opcode is
@@ -80,7 +80,7 @@ begin
             when "0010011" =>  -- I-type ALU immediate
                 o_ALUSrc   <= '1';
                 o_RegWrite <= '1';
-                o_ImmType  <= "00";
+                o_ImmType  <= "000";
                 case i_funct3 is
                     when "000" => o_ALUControl <= ALU_ADD;   -- addi
                     when "111" => o_ALUControl <= ALU_AND;   -- andi
@@ -103,25 +103,25 @@ begin
                 o_RegWrite   <= '1';
                 o_MemRead    <= '1';
                 o_MemToReg   <= '1';
-                o_ImmType    <= "00";
+                o_ImmType    <= "000";
                 o_ALUControl <= ALU_ADD;
 
             when "0100011" =>  -- Store
                 o_ALUSrc   <= '1';
                 o_MemWrite <= '1';
-                o_ImmType  <= "01";
+                o_ImmType  <= "001";
                 o_ALUControl <= ALU_ADD;
 
             when "1100011" =>  -- Branches
                 o_Branch    <= '1';
-                o_ImmType   <= "10";
+                o_ImmType   <= "010";
                 o_ALUControl<= ALU_SUB;
 
             when "1101111" =>  -- JAL
                 o_Jump      <= '1';
                 o_AndLink   <= '1';
                 o_RegWrite  <= '1';
-                o_ImmType   <= "11";
+                o_ImmType   <= "100";
 
             when "1100111" =>  -- JALR
                 o_Jump      <= '1';
@@ -129,19 +129,19 @@ begin
                 o_RegWrite  <= '1';
                 o_ALUSrc    <= '1';
                 o_ALUControl<= ALU_ADD;
-                o_ImmType   <= "00";
+                o_ImmType   <= "000";
 
             when "0110111" =>  -- LUI
                 o_ALUSrc     <= '1';
                 o_RegWrite   <= '1';
                 o_ALUControl <= ALU_PASSIMM;
-                o_ImmType    <= "11";
+                o_ImmType    <= "011";
 
             when "0010111" =>  -- AUIPC
                 o_ALUSrc     <= '1';
                 o_RegWrite   <= '1';
                 o_ALUControl <= ALU_ADD;
-                o_ImmType    <= "11";
+                o_ImmType    <= "011";
 
             when others =>
                 null;
