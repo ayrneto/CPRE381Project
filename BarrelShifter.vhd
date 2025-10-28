@@ -18,9 +18,9 @@ end BarrelShifter;
 architecture Structural of BarrelShifter is
 
     -- Match the ALU control encodings defined in ControlUnit.vhd / ALU.
-    constant ALU_SLL : std_logic_vector(3 downto 0) := "0101";
-    constant ALU_SRL : std_logic_vector(3 downto 0) := "0110";
-    constant ALU_SRA : std_logic_vector(3 downto 0) := "0111";
+    constant ALU_SLL : std_logic_vector(3 downto 0) := "0100";
+    constant ALU_SRL : std_logic_vector(3 downto 0) := "0101";
+    constant ALU_SRA : std_logic_vector(3 downto 0) := "1001";
 
     type stage_array is array (0 to 5) of std_logic_vector(31 downto 0);
 
