@@ -24,17 +24,18 @@ end ControlUnit;
 architecture Behavioral of ControlUnit is
 
     -- ALU control encoding
-    constant ALU_ADD : std_logic_vector(3 downto 0) := "0000";
-    constant ALU_SUB : std_logic_vector(3 downto 0) := "0001";
-    constant ALU_AND : std_logic_vector(3 downto 0) := "0010";
-    constant ALU_OR  : std_logic_vector(3 downto 0) := "0011";
-    constant ALU_XOR : std_logic_vector(3 downto 0) := "0100";
-    constant ALU_SLL : std_logic_vector(3 downto 0) := "0101";
-    constant ALU_SRL : std_logic_vector(3 downto 0) := "0110";
-    constant ALU_SRA : std_logic_vector(3 downto 0) := "0111";
-    constant ALU_SLT : std_logic_vector(3 downto 0) := "1000";
-    constant ALU_SLTU: std_logic_vector(3 downto 0) := "1001";
+    constant ALU_AND : std_logic_vector(3 downto 0) := "0000";
+    constant ALU_OR : std_logic_vector(3 downto 0) := "0001";
+    constant ALU_ADD : std_logic_vector(3 downto 0) := "0010";
+    constant ALU_XOR  : std_logic_vector(3 downto 0) := "0011";
+    constant ALU_SLL : std_logic_vector(3 downto 0) := "0100";
+    constant ALU_SRL : std_logic_vector(3 downto 0) := "0101";
+    constant ALU_SUB : std_logic_vector(3 downto 0) := "0110";
+    constant ALU_SLT : std_logic_vector(3 downto 0) := "0111";
+    constant ALU_SLTU : std_logic_vector(3 downto 0) := "1000";
+    constant ALU_SRA: std_logic_vector(3 downto 0) := "1001";
     constant ALU_PASSIMM : std_logic_vector(3 downto 0) := "1010"; -- for LUI
+    constant ALU_NOR : std_logic_vector(3 downto 0) := "1100"; -- NOR
 
 begin
 

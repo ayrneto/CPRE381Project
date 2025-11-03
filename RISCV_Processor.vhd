@@ -84,6 +84,14 @@ architecture structure of RISCV_Processor is
     signal s_PCSrc_MUX : std_logic_vector(31 downto 0);
     signal s_ReadData1 : std_logic_vector(31 downto 0);
     signal s_ReadData2 : std_logic_vector(31 downto 0);
+    signal s_Branch : std_logic;
+    signal s_Jump : std_logic;
+    signal s_MemRead : std_logic;
+    signal s_MemToReg : std_logic;
+    signal s_AndLink : std_logic;
+    signal s_ALUSrc : std_logic;
+    signal s_ImmType : std_logic_vector(2 downto 0);
+    signal s_ALUControl : std_logic_vector(3 downto 0);
 
 
 
@@ -193,7 +201,7 @@ begin
   -- TODO: Ensure that s_Halt is connected to an output control signal produced from decoding the Halt instruction (Opcode: 01 0100)
   -- TODO: Ensure that s_Ovfl is connected to the overflow output of your ALU
 
-  -- TODO: Implement the rest of your processor below this comment! 
+  -- Implement the rest of your processor below this comment! 
   -- PORT MAPPING:
 
     ProgramCounter : PC
@@ -230,9 +238,22 @@ begin
 		 i_Sel	=> s_PCSrc,
 		 o_Out	=> s_PCSrc_MUX);
 
-    -- TODO: Control here: s_RegWr instead of s_RegWrite, s_DMemWr instead of s_MemWrite
+    -- s_RegWr instead of s_RegWrite, s_DMemWr instead of s_MemWrite
     Control : ControlUnit
-	port map(
+	port map(i_Opcode	=> s_Inst(6 downto 0),
+		 i_funct3	=> s_Inst(14 downto 12),
+		 i_funct7	=> s_Inst(31 downto 25),
+		 o_Branch	=> s_Branch,
+		 o_Jump		=> s_Jump,
+		 o_MemRead	=> s_MemRead,
+		 o_MemToReg	=> s_MemToReg,
+		 o_MemWrite	=> s_DMemWr,
+		 o_AndLink	=> s_AndLink,
+		 o_ALUSrc	=> s_ALUSrc,
+		 o_RegWrite	=> s_RegWr,
+		 o_ImmType	=> s_ImmType,
+		 o_ALUControl	=> s_ALUControl);
+		 
 
     s_RegWrAddr <= s_Inst(11 downto 7);
 
