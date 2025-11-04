@@ -3,6 +3,7 @@ use IEEE.std_logic_1164.all;
 
 -- Ayr Nasser Neto
 -- Normal AddSub, but with a nAdd_Sub extension of 1 bit. Functions the same.
+-- Added SLT functionality
 entity AddSub_32b is 
     generic(N : integer := 32);
     port(i_A	  : in std_logic_vector(31 downto 0);
@@ -37,6 +38,7 @@ architecture structural of AddSub_32b is
     signal s_Inverter 	: std_logic_vector(31 downto 0);
     signal s_MUX	: std_logic_vector(31 downto 0);
     signal s_nAdd_Sub	: std_logic;
+    signal s_ResultSign : std_logic;
 
 
 begin
@@ -61,6 +63,22 @@ begin
 		 i_CarryIn   	=> s_nAdd_Sub,
 		 o_Sum		=> o_Result,
 		 o_CarryOut	=> o_CarryOut);
+
+    s_ResultSign <= o_Result(31);
+
+-- SLT / SLTU implementation
+    process(nAdd_Sub, s_ResultSign)
+	begin
+	if (nAdd_Sub = "10") then -- if SLT is selected
+	    o_Result(31 downto 1) <= (others => '0');
+	    o_Result(0) <= s_ResultSign;
+
+	elsif (nAdd_Sub = "11") then -- if SLTU is selected
+	    o_Result(31 downto 1) <= (others => '0');
+	    o_Result(0) <= NOT o_CarryOut;
+  	
+	end if;
+    end process;
 
 end structural;
 
