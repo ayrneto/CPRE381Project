@@ -28,7 +28,7 @@ entity RISCV_Processor is
        iInstLd         : in std_logic;
        iInstAddr       : in std_logic_vector(N-1 downto 0);
        iInstExt        : in std_logic_vector(N-1 downto 0);
-       oALUOut         : out std_logic_vector(N-1 downto 0)); -- TODO: Hook this up to the output of the ALU. It is important for synthesis that you have this output that can effectively be impacted by all other components so they are not optimized away.
+       oALUOut         : out std_logic_vector(N-1 downto 0)); -- Hook this up to the output of the ALU. It is important for synthesis that you have this output that can effectively be impacted by all other components so they are not optimized away.
 
 end  RISCV_Processor;
 
@@ -36,10 +36,10 @@ end  RISCV_Processor;
 architecture structure of RISCV_Processor is
 
   -- Required data memory signals
-  signal s_DMemWr       : std_logic; -- TODO: use this signal as the final active high data memory write enable signal
-  signal s_DMemAddr     : std_logic_vector(N-1 downto 0); -- TODO: use this signal as the final data memory address input
-  signal s_DMemData     : std_logic_vector(N-1 downto 0); -- TODO: use this signal as the final data memory data input
-  signal s_DMemOut      : std_logic_vector(N-1 downto 0); -- TODO: use this signal as the data memory output
+  signal s_DMemWr       : std_logic; -- use this signal as the final active high data memory write enable signal
+  signal s_DMemAddr     : std_logic_vector(N-1 downto 0); -- use this signal as the final data memory address input
+  signal s_DMemData     : std_logic_vector(N-1 downto 0); -- use this signal as the final data memory data input
+  signal s_DMemOut      : std_logic_vector(N-1 downto 0); -- use this signal as the data memory output
  
   -- Required register file signals 
   signal s_RegWr        : std_logic; -- use this signal as the final active high write enable input to the register file
@@ -80,7 +80,7 @@ architecture structure of RISCV_Processor is
     signal s_BranchingAdder : std_logic_vector(31 downto 0);
     signal s_ImmType : std_logic_vector(2 downto 0); -- Signal from the Control Unit to select the Extender's behavior
     signal s_Extender : std_logic_vector(31 downto 0);
-    signal s_PCSrc : std_logic;
+    signal s_PCSrc : std_logic; -- OR gate output of s_ANDgate and Control Unit's Jump output
     signal s_PCSrc_MUX : std_logic_vector(31 downto 0);
     signal s_ReadData1 : std_logic_vector(31 downto 0);
     signal s_ReadData2 : std_logic_vector(31 downto 0);
@@ -90,8 +90,11 @@ architecture structure of RISCV_Processor is
     signal s_MemToReg : std_logic;
     signal s_AndLink : std_logic;
     signal s_ALUSrc : std_logic;
-    signal s_ImmType : std_logic_vector(2 downto 0);
     signal s_ALUControl : std_logic_vector(3 downto 0);
+    signal s_ANDgate : std_logic; -- AND gate of Control Unit's Branch output and ALU's Zero output
+    signal s_Zero : std_logic;
+    signal s_ALUSrc_MUX : std_logic_vector(31 downto 0); -- Signal output from ALUSrc's MUX
+    signal s_AndLink_MUX : std_logic_vector(31 downto 0);
 
 
 
@@ -124,22 +127,6 @@ architecture structure of RISCV_Processor is
 		 o_Out	: out std_logic_vector(31 downto 0));
     end component;
 
-    component Control is
-	port(	i_Opcode	: in std_logic_vector(6 downto 0);
-	     	i_funct7	: in std_logic_vector(6 downto 0);
-	     	i_funct3	: in std_logic_vector(2 downto 0);
-		o_Branch	: out std_logic;
-		o_Jump		: out std_logic;
-		o_MemRead	: out std_logic;
-		o_MemToReg	: out std_logic;
-		o_MemWrite	: out std_logic;
-		o_AndLink	: out std_logic;
-		o_ALUSrc	: out std_logic;
-		o_RegWrite	: out std_logic;
-		o_ImmType	: out std_logic_vector(2 downto 0);
-		o_ALUControl	: out std_logic_vector(3 downto 0));
-    end component;
-
     component RegisterFile is
 	port(	i_CLK        : in  std_logic;
         	i_RST        : in  std_logic;
@@ -168,6 +155,15 @@ architecture structure of RISCV_Processor is
         o_RegWrite   : out std_logic;
         o_ImmType    : out std_logic_vector(2 downto 0);
         o_ALUControl : out std_logic_vector(3 downto 0));
+    end component;
+
+    component ALU is
+	port(i_A	  : in std_logic_vector(31 downto 0);
+	     i_B   	  : in std_logic_vector(31 downto 0);
+	     i_ALUControl : in std_logic_vector(3 downto 0);
+	     i_shamt      : in std_logic_vector(4 downto 0);
+	     o_ALUOut     : out std_logic_vector(31 downto 0);
+	     o_Zero       : out std_logic);
     end component;
 
 
@@ -261,12 +257,47 @@ begin
 	port map(i_CLK		=> iCLK,
 		 i_RST		=> iRST,
 		 i_RegWrite	=> s_RegWr,
-		 i_ReadReg1	=> s_Inst(19 downto 14),
+		 i_ReadReg1	=> s_Inst(19 downto 15),
 		 i_ReadReg2	=> s_Inst(24 downto 20),
 		 i_WriteReg	=> s_RegWrAddr,
 		 i_WriteData	=> s_RegWrData,
 		 o_ReadData1	=> s_ReadData1,
 		 o_ReadData2	=> s_ReadData2);
+
+    ALUSrc_MUX : mux2to1_32b
+	port map(i_A	=> s_ReadData2,
+		 i_B	=> s_Extender,
+		 i_Sel	=> s_ALUSrc,
+		 o_Out	=> s_ALUSrc_MUX);
+
+    ALU_Component : ALU
+	port map(i_A		=> s_ReadData1,
+		 i_B		=> s_ALUSrc_MUX,
+		 i_ALUControl	=> s_ALUControl,
+		 i_shamt	=> s_Inst(24 downto 20),
+		 o_ALUOut	=> oALUOut,
+		 o_Zero		=> s_Zero);
+
+    s_ANDgate <= s_Branch AND s_Zero;
+
+    s_PCSrc <= s_ANDgate OR s_Jump;
+
+    -- DMem signals:
+    s_DMemAddr	<= oALUOut;
+    s_DMemData	<= s_ReadData2;
+
+    AndLink_MUX : mux2to1_32b
+	port map(i_A	=> oALUOut,
+		 i_B	=> s_Plus4Adder,
+		 i_Sel	=> s_AndLink,
+		 o_Out	=> s_AndLink_MUX);
+
+    MemToReg_MUX : mux2to1_32b
+	port map(i_A	=> s_AndLink_MUX,
+		 i_B	=> s_DMemOut,
+		 i_Sel	=> s_MemToReg,
+		 o_Out	=> s_RegWrData);
+    
 
     
 

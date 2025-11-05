@@ -25,7 +25,7 @@ architecture structural of ALU is
 
     component ALUDecoder is
 	port(i_ALUControl : in std_logic_vector(3 downto 0);
-	     o_Out	  : in std_logic_vector(1 downto 0));
+	     o_Out	  : out std_logic_vector(1 downto 0));
     end component;
 
     component LogicUnit is
