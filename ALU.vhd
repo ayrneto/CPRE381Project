@@ -8,7 +8,8 @@ entity ALU is
          i_B        : in  std_logic_vector(31 downto 0);
          i_ALUControl : in  std_logic_vector(3 downto 0);
          i_shamt    : in  std_logic_vector(4 downto 0);
-         o_ALUOut   : out std_logic_vector(31 downto 0));
+         o_ALUOut   : out std_logic_vector(31 downto 0);
+         o_Ovfl     : out std_logic); -- asserted on signed add/sub overflow
 end ALU;
 
 architecture structural of ALU is
@@ -63,6 +64,7 @@ architecture structural of ALU is
     signal s_B_signed : signed(31 downto 0);
     signal s_A_unsigned : unsigned(31 downto 0);
     signal s_B_unsigned : unsigned(31 downto 0);
+    signal s_Overflow : std_logic;
 
 begin
 
@@ -107,6 +109,26 @@ begin
     s_SLT_Result <= x"00000001" when (s_A_signed < s_B_signed) else x"00000000";
     s_SLTU_Result <= x"00000001" when (s_A_unsigned < s_B_unsigned) else x"00000000";
 
+    -- Overflow is only meaningful for signed add/sub operations.
+    process(i_ALUControl, i_A, i_B, s_AddSub_Result)
+    begin
+        if i_ALUControl = ALU_ADD then
+            if (i_A(31) = i_B(31)) and (s_AddSub_Result(31) /= i_A(31)) then
+                s_Overflow <= '1';
+            else
+                s_Overflow <= '0';
+            end if;
+        elsif i_ALUControl = ALU_SUB then
+            if (i_A(31) /= i_B(31)) and (s_AddSub_Result(31) /= i_A(31)) then
+                s_Overflow <= '1';
+            else
+                s_Overflow <= '0';
+            end if;
+        else
+            s_Overflow <= '0';
+        end if;
+    end process;
+
     -- Output multiplexer
     process(i_ALUControl, s_AddSub_Result, s_Logic_Result, s_Shift_Result, s_SLT_Result, s_SLTU_Result, i_B)
     begin
@@ -127,6 +149,8 @@ begin
                 o_ALUOut <= s_AddSub_Result; -- Default to ADD
         end case;
     end process;
+
+    o_Ovfl <= s_Overflow;
 end structural;
     
 

@@ -17,7 +17,12 @@ entity ControlUnit is
         o_ALUSrc     : out std_logic;
         o_RegWrite   : out std_logic;
         o_ImmType    : out std_logic_vector(2 downto 0);
-        o_ALUControl : out std_logic_vector(3 downto 0)
+        o_ALUControl : out std_logic_vector(3 downto 0);
+        o_LoadWidth  : out std_logic_vector(1 downto 0); -- 00=byte,01=half,10=word
+        o_LoadSigned : out std_logic;                    -- 1=signed extend, 0=zero extend
+        o_StoreWidth : out std_logic_vector(1 downto 0); -- matches o_LoadWidth encoding
+        o_BranchType : out std_logic_vector(2 downto 0); -- pass through funct3 for branch unit
+        o_Halt       : out std_logic                     -- asserted on wfi "halt" instruction
     );
 end ControlUnit;
 
@@ -52,6 +57,11 @@ begin
         o_RegWrite   <= '0';
         o_ImmType    <= "000";
         o_ALUControl <= ALU_ADD;
+        o_LoadWidth  <= "10";
+        o_LoadSigned <= '1';
+        o_StoreWidth <= "10";
+        o_BranchType <= "000";
+        o_Halt       <= '0';
 
         case i_Opcode is
             when "0110011" =>  -- R-type
@@ -106,17 +116,45 @@ begin
                 o_MemToReg   <= '1';
                 o_ImmType    <= "000";
                 o_ALUControl <= ALU_ADD;
+                case i_funct3 is
+                    when "000" => -- lb
+                        o_LoadWidth  <= "00";
+                        o_LoadSigned <= '1';
+                    when "001" => -- lh
+                        o_LoadWidth  <= "01";
+                        o_LoadSigned <= '1';
+                    when "010" => -- lw
+                        o_LoadWidth  <= "10";
+                        o_LoadSigned <= '1';
+                    when "100" => -- lbu
+                        o_LoadWidth  <= "00";
+                        o_LoadSigned <= '0';
+                    when "101" => -- lhu
+                        o_LoadWidth  <= "01";
+                        o_LoadSigned <= '0';
+                    when others => null;
+                end case;
 
             when "0100011" =>  -- Store
                 o_ALUSrc   <= '1';
                 o_MemWrite <= '1';
                 o_ImmType  <= "001";
                 o_ALUControl <= ALU_ADD;
+                case i_funct3 is
+                    when "000" => -- sb
+                        o_StoreWidth <= "00";
+                    when "001" => -- sh
+                        o_StoreWidth <= "01";
+                    when "010" => -- sw
+                        o_StoreWidth <= "10";
+                    when others => null;
+                end case;
 
             when "1100011" =>  -- Branches
                 o_Branch    <= '1';
                 o_ImmType   <= "010";
                 o_ALUControl<= ALU_SUB;
+                o_BranchType<= i_funct3;
 
             when "1101111" =>  -- JAL
                 o_Jump      <= '1';
@@ -143,6 +181,11 @@ begin
                 o_RegWrite   <= '1';
                 o_ALUControl <= ALU_ADD;
                 o_ImmType    <= "011";
+
+            when "1110011" =>  -- SYSTEM (used for WFI/HALT)
+                if i_funct7 = "0001000" and i_funct3 = "000" then
+                    o_Halt <= '1';
+                end if;
 
             when others =>
                 null;

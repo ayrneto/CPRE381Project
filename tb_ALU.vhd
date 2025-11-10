@@ -7,11 +7,12 @@ end tb_ALU;
 
 architecture testbench of tb_ALU is
     component ALU
-        port(i_A	      : in std_logic_vector(31 downto 0);
-	     i_B   	      : in std_logic_vector(31 downto 0);
-	     i_ALUControl     : in std_logic_vector(3 downto 0);
-	     i_shamt          : in std_logic_vector(4 downto 0);
-	     o_ALUOut         : out std_logic_vector(31 downto 0));
+        port(i_A          : in std_logic_vector(31 downto 0);
+             i_B          : in std_logic_vector(31 downto 0);
+             i_ALUControl : in std_logic_vector(3 downto 0);
+             i_shamt      : in std_logic_vector(4 downto 0);
+             o_ALUOut     : out std_logic_vector(31 downto 0);
+             o_Ovfl       : out std_logic);
     end component;
 
     signal i_A           : std_logic_vector(31 downto 0);
@@ -19,6 +20,7 @@ architecture testbench of tb_ALU is
     signal i_ALUControl  : std_logic_vector(3 downto 0);
     signal i_shamt       : std_logic_vector(4 downto 0);
     signal o_ALUOut      : std_logic_vector(31 downto 0);
+    signal o_Ovfl        : std_logic;
 
     -- ALU control constants
     constant ALU_AND     : std_logic_vector(3 downto 0) := "0000";
@@ -41,7 +43,8 @@ begin
             i_B         => i_B,
             i_ALUControl => i_ALUControl,
             i_shamt     => i_shamt,
-            o_ALUOut    => o_ALUOut
+            o_ALUOut    => o_ALUOut,
+            o_Ovfl      => o_Ovfl
         );
 
     process
@@ -53,6 +56,7 @@ begin
         i_shamt <= "00000";
         wait for 10 ns;
         -- Expected: 0x00000008
+    assert o_Ovfl = '0' report "Unexpected overflow on ADD" severity error;
 
         -- Test SUB operation
         i_A <= x"00000008";
@@ -60,6 +64,7 @@ begin
         i_ALUControl <= ALU_SUB;
         wait for 10 ns;
         -- Expected: 0x00000005
+    assert o_Ovfl = '0' report "Unexpected overflow on SUB" severity error;
 
         -- Test AND operation
         i_A <= x"0000000F";
@@ -67,6 +72,7 @@ begin
         i_ALUControl <= ALU_AND;
         wait for 10 ns;
         -- Expected: 0x0000000A
+    assert o_Ovfl = '0' report "Unexpected overflow on AND" severity error;
 
         -- Test OR operation
         i_A <= x"0000000F";
@@ -74,6 +80,7 @@ begin
         i_ALUControl <= ALU_OR;
         wait for 10 ns;
         -- Expected: 0x000000AF
+    assert o_Ovfl = '0' report "Unexpected overflow on OR" severity error;
 
         -- Test XOR operation
         i_A <= x"0000000F";
@@ -81,6 +88,7 @@ begin
         i_ALUControl <= ALU_XOR;
         wait for 10 ns;
         -- Expected: 0x000000A5
+    assert o_Ovfl = '0' report "Unexpected overflow on XOR" severity error;
 
         -- Test NOR operation
         i_A <= x"0000000F";
@@ -88,6 +96,7 @@ begin
         i_ALUControl <= ALU_NOR;
         wait for 10 ns;
         -- Expected: 0xFFFFFF50
+    assert o_Ovfl = '0' report "Unexpected overflow on NOR" severity error;
 
         -- Test SLL (Shift Left Logical)
         i_A <= x"00000001";
@@ -95,6 +104,7 @@ begin
         i_ALUControl <= ALU_SLL;
         wait for 10 ns;
         -- Expected: 0x00000010
+    assert o_Ovfl = '0' report "Unexpected overflow on SLL" severity error;
 
         -- Test SRL (Shift Right Logical)
         i_A <= x"80000000";
@@ -102,6 +112,7 @@ begin
         i_ALUControl <= ALU_SRL;
         wait for 10 ns;
         -- Expected: 0x40000000
+    assert o_Ovfl = '0' report "Unexpected overflow on SRL" severity error;
 
         -- Test SRA (Shift Right Arithmetic)
         i_A <= x"80000000";
@@ -109,6 +120,7 @@ begin
         i_ALUControl <= ALU_SRA;
         wait for 10 ns;
         -- Expected: 0xC0000000
+    assert o_Ovfl = '0' report "Unexpected overflow on SRA" severity error;
 
         -- Test SLT (Set Less Than) - signed
         i_A <= x"FFFFFFFF"; -- -1 in signed
@@ -116,6 +128,7 @@ begin
         i_ALUControl <= ALU_SLT;
         wait for 10 ns;
         -- Expected: 0x00000001 (true, -1 < 1)
+    assert o_Ovfl = '0' report "Unexpected overflow on SLT" severity error;
 
         -- Test SLTU (Set Less Than Unsigned)
         i_A <= x"FFFFFFFF"; -- Large unsigned number
@@ -123,6 +136,7 @@ begin
         i_ALUControl <= ALU_SLTU;
         wait for 10 ns;
         -- Expected: 0x00000000 (false, 0xFFFFFFFF > 1)
+    assert o_Ovfl = '0' report "Unexpected overflow on SLTU" severity error;
 
         -- Test PASSIMM (for LUI instruction)
         i_A <= x"12345678";
@@ -130,6 +144,7 @@ begin
         i_ALUControl <= ALU_PASSIMM;
         wait for 10 ns;
         -- Expected: 0xABCD0000 (passes B through)
+    assert o_Ovfl = '0' report "Unexpected overflow on PASSIMM" severity error;
 
         -- Test edge cases
         -- ADD with overflow
@@ -138,6 +153,7 @@ begin
         i_ALUControl <= ALU_ADD;
         wait for 10 ns;
         -- Expected: 0x80000000 (overflow to negative)
+    assert o_Ovfl = '1' report "Overflow not detected on ADD" severity error;
 
         -- SUB with underflow
         i_A <= x"80000000"; -- Minimum negative signed int
@@ -145,6 +161,7 @@ begin
         i_ALUControl <= ALU_SUB;
         wait for 10 ns;
         -- Expected: 0x7FFFFFFF (underflow to positive)
+    assert o_Ovfl = '1' report "Overflow not detected on SUB" severity error;
 
         wait;
     end process;

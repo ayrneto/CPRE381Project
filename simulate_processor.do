@@ -8,7 +8,13 @@ vmap work work
 # Compile all VHDL design files
 echo "Compiling VHDL Design Files..."
 
+# Shared packages and memories
+vcom -2008 {cpre3810-toolflow (3)/cpre3810-toolflow/internal/boilerplate_src/RISCV_types.vhd}
+vcom -2008 {cpre3810-toolflow (3)/cpre3810-toolflow/internal/boilerplate_src/TopLevel/mem.vhd}
+
 vcom -2008 AddSub_32b.vhd
+vcom -2008 NBitRegister.vhd
+vcom -2008 RegisterFile.vhd
 vcom -2008 LogicUnit.vhd  
 vcom -2008 BarrelShifter.vhd
 vcom -2008 ALU.vhd

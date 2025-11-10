@@ -72,6 +72,9 @@ architecture structure of RISCV_Processor is
   -- TODO: You may add any additional signals or components your implementation 
   --       requires below this comment
   -- SIGNALS AND COMPONENTS:
+  constant ALU_SLL : std_logic_vector(3 downto 0) := "0100";
+  constant ALU_SRL : std_logic_vector(3 downto 0) := "0101";
+  constant ALU_SRA : std_logic_vector(3 downto 0) := "1001";
 
   signal s_PCInput : std_logic_vector(N-1 downto 0);
   signal s_Plus4Adder : std_logic_vector(N-1 downto 0);
@@ -96,9 +99,25 @@ architecture structure of RISCV_Processor is
   signal s_WriteBack : std_logic_vector(N-1 downto 0);
   signal s_LinkData : std_logic_vector(N-1 downto 0);
   signal s_JumpTarget : std_logic_vector(N-1 downto 0);
-  signal s_ALUZero : std_logic;
   signal s_Shamt    : std_logic_vector(4 downto 0);
   signal s_AUIPC    : std_logic;
+  signal s_LoadWidth  : std_logic_vector(1 downto 0);
+  signal s_LoadSigned : std_logic;
+  signal s_StoreWidth : std_logic_vector(1 downto 0);
+  signal s_BranchType : std_logic_vector(2 downto 0);
+  signal s_BranchTaken: std_logic;
+  signal s_LoadData   : std_logic_vector(N-1 downto 0);
+  signal s_StoreData  : std_logic_vector(N-1 downto 0);
+  signal s_ByteOffset : std_logic_vector(1 downto 0);
+  signal s_CmpEq       : std_logic;
+  signal s_CmpSignedLT : std_logic;
+  signal s_CmpSignedGE : std_logic;
+  signal s_CmpUnsignedLT : std_logic;
+  signal s_CmpUnsignedGE : std_logic;
+  signal s_ALUOverflow : std_logic;
+  signal s_ControlHalt : std_logic;
+  signal s_JumpTargetJAL  : std_logic_vector(N-1 downto 0);
+  signal s_JumpTargetJALR : std_logic_vector(N-1 downto 0);
 
   component AddSub_32b is
     generic(N : integer := 32);
@@ -131,11 +150,13 @@ architecture structure of RISCV_Processor is
   end component;
 
   component ALU is
-    port(i_A        : in  std_logic_vector(31 downto 0);
-       i_B        : in  std_logic_vector(31 downto 0);
-       i_ALUControl : in  std_logic_vector(3 downto 0);
-       i_shamt    : in  std_logic_vector(4 downto 0);
-       o_ALUOut   : out std_logic_vector(31 downto 0));
+    port(
+      i_A         : in  std_logic_vector(31 downto 0);
+      i_B         : in  std_logic_vector(31 downto 0);
+      i_ALUControl: in  std_logic_vector(3 downto 0);
+      i_shamt     : in  std_logic_vector(4 downto 0);
+      o_ALUOut    : out std_logic_vector(31 downto 0);
+      o_Ovfl      : out std_logic);
   end component;
 
     component RegisterFile is
@@ -150,23 +171,28 @@ architecture structure of RISCV_Processor is
         	o_ReadData2  : out std_logic_vector(31 downto 0));
     end component;
 
-    component ControlUnit is
-        port (
-        i_Opcode     : in  std_logic_vector(6 downto 0);
-        i_funct3     : in  std_logic_vector(2 downto 0);
-        i_funct7     : in  std_logic_vector(6 downto 0);
+  component ControlUnit is
+    port(
+      i_Opcode     : in  std_logic_vector(6 downto 0);
+      i_funct3     : in  std_logic_vector(2 downto 0);
+      i_funct7     : in  std_logic_vector(6 downto 0);
 
-        o_Branch     : out std_logic;
-        o_Jump       : out std_logic;
-        o_MemRead    : out std_logic;
-        o_MemToReg   : out std_logic;
-        o_MemWrite   : out std_logic;
-        o_AndLink    : out std_logic;
-        o_ALUSrc     : out std_logic;
-        o_RegWrite   : out std_logic;
-        o_ImmType    : out std_logic_vector(2 downto 0);
-        o_ALUControl : out std_logic_vector(3 downto 0));
-    end component;
+      o_Branch     : out std_logic;
+      o_Jump       : out std_logic;
+      o_MemRead    : out std_logic;
+      o_MemToReg   : out std_logic;
+      o_MemWrite   : out std_logic;
+      o_AndLink    : out std_logic;
+      o_ALUSrc     : out std_logic;
+      o_RegWrite   : out std_logic;
+      o_ImmType    : out std_logic_vector(2 downto 0);
+      o_ALUControl : out std_logic_vector(3 downto 0);
+      o_LoadWidth  : out std_logic_vector(1 downto 0);
+      o_LoadSigned : out std_logic;
+      o_StoreWidth : out std_logic_vector(1 downto 0);
+      o_BranchType : out std_logic_vector(2 downto 0);
+      o_Halt       : out std_logic);
+  end component;
 
 
 
@@ -196,8 +222,7 @@ begin
              we   => s_DMemWr,
              q    => s_DMemOut);
 
-  -- TODO: Ensure that s_Halt is connected to an output control signal produced from decoding the Halt instruction (Opcode: 01 0100)
-  -- TODO: Ensure that s_Ovfl is connected to the overflow output of your ALU
+  -- s_Halt and s_Ovfl are driven near the end of this architecture.
 
   -- Implement the rest of your processor below this comment! 
   -- PORT MAPPING:
@@ -249,9 +274,16 @@ begin
          o_ALUSrc    => s_ALUSrc,
          o_RegWrite  => s_RegWr,
          o_ImmType   => s_ImmType,
-         o_ALUControl=> s_ALUControl);
+         o_ALUControl=> s_ALUControl,
+         o_LoadWidth => s_LoadWidth,
+         o_LoadSigned=> s_LoadSigned,
+         o_StoreWidth=> s_StoreWidth,
+         o_BranchType=> s_BranchType,
+         o_Halt      => s_ControlHalt);
 
-  s_Shamt <= s_Inst(24 downto 20);
+  s_Shamt <= s_Inst(24 downto 20) when (s_ALUSrc = '1' and
+                   (s_ALUControl = ALU_SLL or s_ALUControl = ALU_SRL or s_ALUControl = ALU_SRA))
+              else s_ReadData2(4 downto 0);
   s_ALUInputB <= s_Extender when s_ALUSrc = '1' else s_ReadData2;
 
   ALU_inst : ALU
@@ -259,9 +291,8 @@ begin
          i_B         => s_ALUInputB,
          i_ALUControl=> s_ALUControl,
          i_shamt     => s_Shamt,
-         o_ALUOut    => s_ALUResult);
-
-  s_ALUZero <= '1' when s_ALUResult = (others => '0') else '0';
+         o_ALUOut    => s_ALUResult,
+         o_Ovfl      => s_ALUOverflow);
 
     s_RegWrAddr <= s_Inst(11 downto 7);
 
@@ -279,21 +310,115 @@ begin
   s_AUIPC     <= '1' when s_Inst(6 downto 0) = "0010111" else '0';
   s_ALUInputA <= s_NextInstAddr when s_AUIPC = '1' else s_ReadData1;
 
-  s_PCSrc      <= s_Branch and s_ALUZero;
-  s_PCInput    <= s_JumpTarget when s_Jump = '1' else s_PCSrc_MUX;
-  s_JumpTarget <= s_BranchingAdder when (s_Jump = '1' and s_ALUSrc = '0') else s_ALUResult;
+  s_CmpEq        <= '1' when s_ReadData1 = s_ReadData2 else '0';
+  s_CmpSignedLT  <= '1' when signed(s_ReadData1) < signed(s_ReadData2) else '0';
+  s_CmpSignedGE  <= '1' when signed(s_ReadData1) >= signed(s_ReadData2) else '0';
+  s_CmpUnsignedLT<= '1' when unsigned(s_ReadData1) < unsigned(s_ReadData2) else '0';
+  s_CmpUnsignedGE<= '1' when unsigned(s_ReadData1) >= unsigned(s_ReadData2) else '0';
+
+  -- Decode the branch funct3 to decide whether the current comparison warrants a redirect.
+  branch_decider : process(s_BranchType, s_CmpEq, s_CmpSignedLT, s_CmpSignedGE,
+                           s_CmpUnsignedLT, s_CmpUnsignedGE)
+  begin
+    case s_BranchType is
+      when "000" => s_BranchTaken <= s_CmpEq;            -- beq
+      when "001" => s_BranchTaken <= not s_CmpEq;       -- bne
+      when "100" => s_BranchTaken <= s_CmpSignedLT;     -- blt
+      when "101" => s_BranchTaken <= s_CmpSignedGE;     -- bge
+      when "110" => s_BranchTaken <= s_CmpUnsignedLT;   -- bltu
+      when "111" => s_BranchTaken <= s_CmpUnsignedGE;   -- bgeu
+      when others => s_BranchTaken <= '0';
+    end case;
+  end process;
+
+  s_PCSrc   <= s_Branch and s_BranchTaken;
+
+  s_JumpTargetJAL  <= s_BranchingAdder;
+  s_JumpTargetJALR <= s_ALUResult(N-1 downto 1) & '0'; -- enforce alignment for JALR
+  s_JumpTarget     <= s_JumpTargetJAL when s_ALUSrc = '0' else s_JumpTargetJALR;
+  s_PCInput        <= s_JumpTarget when s_Jump = '1' else s_PCSrc_MUX;
   s_LinkData   <= s_Plus4Adder;
 
-  s_WriteBack <= s_DMemOut when s_MemToReg = '1' else s_ALUResult;
+  -- Capture the byte lane within the addressed word for load/store width handling.
+  s_ByteOffset <= s_ALUResult(1 downto 0);
+
+  -- Merge store data into the targeted byte/halfword lane before issuing the write.
+  store_packer : process(s_ReadData2, s_DMemOut, s_StoreWidth, s_ByteOffset)
+    variable v_word : std_logic_vector(31 downto 0);
+    variable v_half : std_logic_vector(15 downto 0);
+    variable v_byte : std_logic_vector(7 downto 0);
+  begin
+    v_word := s_DMemOut;
+    case s_StoreWidth is
+      when "00" =>  -- byte store
+        v_byte := s_ReadData2(7 downto 0);
+        case s_ByteOffset is
+          when "00" => v_word(7 downto 0)   := v_byte;
+          when "01" => v_word(15 downto 8)  := v_byte;
+          when "10" => v_word(23 downto 16) := v_byte;
+          when others => v_word(31 downto 24) := v_byte;
+        end case;
+      when "01" =>  -- halfword store
+        v_half := s_ReadData2(15 downto 0);
+        if s_ByteOffset(1) = '0' then
+          v_word(15 downto 0) := v_half;
+        else
+          v_word(31 downto 16) := v_half;
+        end if;
+      when others => -- word store (default)
+        v_word := s_ReadData2;
+    end case;
+    s_StoreData <= v_word;
+  end process;
+
+  -- Extract the correct slice from the memory word and apply sign/zero extension.
+  load_unpacker : process(s_DMemOut, s_LoadWidth, s_LoadSigned, s_ByteOffset)
+    variable v_result : std_logic_vector(31 downto 0);
+    variable v_byte   : std_logic_vector(7 downto 0);
+    variable v_half   : std_logic_vector(15 downto 0);
+  begin
+    v_result := s_DMemOut; -- default to word
+    case s_LoadWidth is
+      when "00" =>  -- byte load
+        case s_ByteOffset is
+          when "00" => v_byte := s_DMemOut(7 downto 0);
+          when "01" => v_byte := s_DMemOut(15 downto 8);
+          when "10" => v_byte := s_DMemOut(23 downto 16);
+          when others => v_byte := s_DMemOut(31 downto 24);
+        end case;
+        if s_LoadSigned = '1' then
+          v_result := std_logic_vector(resize(signed(v_byte), 32));
+        else
+          v_result := std_logic_vector(resize(unsigned(v_byte), 32));
+        end if;
+      when "01" =>  -- halfword load
+        if s_ByteOffset(1) = '0' then
+          v_half := s_DMemOut(15 downto 0);
+        else
+          v_half := s_DMemOut(31 downto 16);
+        end if;
+        if s_LoadSigned = '1' then
+          v_result := std_logic_vector(resize(signed(v_half), 32));
+        else
+          v_result := std_logic_vector(resize(unsigned(v_half), 32));
+        end if;
+      when others =>
+        v_result := s_DMemOut;
+    end case;
+    s_LoadData <= v_result;
+  end process;
+
+  s_WriteBack <= s_LoadData when s_MemToReg = '1' else s_ALUResult;
   s_RegWrData <= s_LinkData when s_AndLink = '1' else s_WriteBack;
 
   s_DMemAddr <= s_ALUResult;
-  s_DMemData <= s_ReadData2;
+  s_DMemData <= s_StoreData;
 
   oALUOut <= s_ALUResult;
 
-  s_Halt <= '0';
-  s_Ovfl <= '0';
+  -- Surface halt/overflow information to the toolflow harness.
+  s_Halt <= s_ControlHalt;
+  s_Ovfl <= s_ALUOverflow;
 
 end structure;
 

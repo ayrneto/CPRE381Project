@@ -8,19 +8,24 @@ end tb_ControlUnit;
 architecture testbench of tb_ControlUnit is
     component ControlUnit
         port (
-            i_Opcode     : in  std_logic_vector(6 downto 0);
-            i_funct3     : in  std_logic_vector(2 downto 0);
-            i_funct7     : in  std_logic_vector(6 downto 0);
-            o_Branch     : out std_logic;
-            o_Jump       : out std_logic;
-            o_MemRead    : out std_logic;
-            o_MemToReg   : out std_logic;
-            o_MemWrite   : out std_logic;
-            o_AndLink    : out std_logic;
-            o_ALUSrc     : out std_logic;
-            o_RegWrite   : out std_logic;
-            o_ImmType    : out std_logic_vector(2 downto 0);
-            o_ALUControl : out std_logic_vector(3 downto 0)
+            i_Opcode     : in  std_logic_vector(6 downto 0); -- opcode bits
+            i_funct3     : in  std_logic_vector(2 downto 0); -- funct3 field
+            i_funct7     : in  std_logic_vector(6 downto 0); -- funct7 field
+            o_Branch     : out std_logic;                    -- branch enable
+            o_Jump       : out std_logic;                    -- jump enable
+            o_MemRead    : out std_logic;                    -- data memory read
+            o_MemToReg   : out std_logic;                    -- write-back selects mem
+            o_MemWrite   : out std_logic;                    -- data memory write
+            o_AndLink    : out std_logic;                    -- link register write
+            o_ALUSrc     : out std_logic;                    -- selects immediate to ALU
+            o_RegWrite   : out std_logic;                    -- register write enable
+            o_ImmType    : out std_logic_vector(2 downto 0); -- immediate decoder select
+            o_ALUControl : out std_logic_vector(3 downto 0); -- ALU operation
+            o_LoadWidth  : out std_logic_vector(1 downto 0); -- load width control
+            o_LoadSigned : out std_logic;                    -- load sign/zero select
+            o_StoreWidth : out std_logic_vector(1 downto 0); -- store width control
+            o_BranchType : out std_logic_vector(2 downto 0); -- branch comparator select
+            o_Halt       : out std_logic                     -- halt flag for WFI
         );
     end component;
 
@@ -37,6 +42,11 @@ architecture testbench of tb_ControlUnit is
     signal o_RegWrite   : std_logic;
     signal o_ImmType    : std_logic_vector(2 downto 0);
     signal o_ALUControl : std_logic_vector(3 downto 0);
+    signal o_LoadWidth  : std_logic_vector(1 downto 0);
+    signal o_LoadSigned : std_logic;
+    signal o_StoreWidth : std_logic_vector(1 downto 0);
+    signal o_BranchType : std_logic_vector(2 downto 0);
+    signal o_Halt       : std_logic;
 
 begin
     uut: ControlUnit
@@ -53,7 +63,12 @@ begin
             o_ALUSrc     => o_ALUSrc,
             o_RegWrite   => o_RegWrite,
             o_ImmType    => o_ImmType,
-            o_ALUControl => o_ALUControl
+            o_ALUControl => o_ALUControl,
+            o_LoadWidth  => o_LoadWidth,
+            o_LoadSigned => o_LoadSigned,
+            o_StoreWidth => o_StoreWidth,
+            o_BranchType => o_BranchType,
+            o_Halt       => o_Halt
         );
 
     process
@@ -161,48 +176,62 @@ begin
         wait for 10 ns;
         -- Expected: ALUSrc=1, RegWrite=1, ImmType=000, ALUControl=1000
 
-        -- Test 20: LW (Load)
-        i_Opcode  <= "0000011";
-        i_funct3  <= "010";
-        wait for 10 ns;
-        -- Expected: ALUSrc=1, RegWrite=1, MemRead=1, MemToReg=1, ImmType=000
+    -- Test 20: LW (Load)
+    i_Opcode  <= "0000011";
+    i_funct3  <= "010";
+    wait for 10 ns;
+    -- Expected: ALUSrc=1, RegWrite=1, MemRead=1, MemToReg=1, ImmType=000
+    assert o_LoadWidth = "10" and o_LoadSigned = '1'
+        report "Load control decode mismatch for LW" severity error;
 
-        -- Test 21: SW (Store)
-        i_Opcode  <= "0100011";
-        i_funct3  <= "010";
-        wait for 10 ns;
-        -- Expected: ALUSrc=1, MemWrite=1, ImmType=001
+    -- Test 21: SW (Store)
+    i_Opcode  <= "0100011";
+    i_funct3  <= "010";
+    wait for 10 ns;
+    -- Expected: ALUSrc=1, MemWrite=1, ImmType=001
+    assert o_StoreWidth = "10"
+        report "Store control decode mismatch for SW" severity error;
 
-        -- Test 22: BEQ (Branch)
-        i_Opcode  <= "1100011";
-        i_funct3  <= "000";
-        wait for 10 ns;
-        -- Expected: Branch=1, ImmType=010, ALUControl=0110 (SUB for comparison)
+    -- Test 22: BEQ (Branch)
+    i_Opcode  <= "1100011";
+    i_funct3  <= "000";
+    wait for 10 ns;
+    -- Expected: Branch=1, ImmType=010, ALUControl=0110 (SUB for comparison)
+    assert o_BranchType = "000"
+        report "Branch control decode mismatch for BEQ" severity error;
 
-        -- Test 23: JAL (Jump and Link)
-        i_Opcode  <= "1101111";
-        wait for 10 ns;
-        -- Expected: Jump=1, AndLink=1, RegWrite=1, ImmType=100
+    -- Test 23: JAL (Jump and Link)
+    i_Opcode  <= "1101111";
+    wait for 10 ns;
+    -- Expected: Jump=1, AndLink=1, RegWrite=1, ImmType=100
 
-        -- Test 24: JALR (Jump and Link Register)
-        i_Opcode  <= "1100111";
-        wait for 10 ns;
-        -- Expected: Jump=1, AndLink=1, RegWrite=1, ALUSrc=1, ImmType=000
+    -- Test 24: JALR (Jump and Link Register)
+    i_Opcode  <= "1100111";
+    wait for 10 ns;
+    -- Expected: Jump=1, AndLink=1, RegWrite=1, ALUSrc=1, ImmType=000
 
-        -- Test 25: LUI (Load Upper Immediate)
-        i_Opcode  <= "0110111";
-        wait for 10 ns;
-        -- Expected: ALUSrc=1, RegWrite=1, ALUControl=1010 (PASSIMM), ImmType=011
+    -- Test 25: LUI (Load Upper Immediate)
+    i_Opcode  <= "0110111";
+    wait for 10 ns;
+    -- Expected: ALUSrc=1, RegWrite=1, ALUControl=1010 (PASSIMM), ImmType=011
 
-        -- Test 26: AUIPC (Add Upper Immediate to PC)
-        i_Opcode  <= "0010111";
-        wait for 10 ns;
-        -- Expected: ALUSrc=1, RegWrite=1, ALUControl=0010 (ADD), ImmType=011
+    -- Test 26: AUIPC (Add Upper Immediate to PC)
+    i_Opcode  <= "0010111";
+    wait for 10 ns;
+    -- Expected: ALUSrc=1, RegWrite=1, ALUControl=0010 (ADD), ImmType=011
 
-        -- Test 27: Invalid opcode
-        i_Opcode  <= "1111111";
-        wait for 10 ns;
-        -- Expected: Default values (all control signals should be 0 except ALUControl=0010)
+    -- Test 27: WFI (System Halt)
+    i_Opcode  <= "1110011";
+    i_funct3  <= "000";
+    i_funct7  <= "0001000";
+    wait for 10 ns;
+    assert o_Halt = '1'
+        report "Halt control not asserted for WFI" severity error;
+
+    -- Test 28: Invalid opcode
+    i_Opcode  <= "1111111";
+    wait for 10 ns;
+    -- Expected: Default values (all control signals should be 0 except ALUControl=0010)
 
         report "ControlUnit testbench completed";
         wait;
