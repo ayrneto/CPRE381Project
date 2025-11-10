@@ -7,6 +7,8 @@ echo ============================
 
 # Compile supporting components first
 vcom AddSub_32b.vhd
+vcom NBitRegister.vhd
+vcom RegisterFile.vhd
 vcom LogicUnit.vhd
 vcom mux2to1_32b.vhd
 vcom Extender.vhd

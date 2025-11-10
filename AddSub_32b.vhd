@@ -1,86 +1,47 @@
 library IEEE;
 use IEEE.std_logic_1164.all;
+use IEEE.numeric_std.all;
 
 -- Ayr Nasser Neto
 -- Normal AddSub, but with a nAdd_Sub extension of 1 bit. Functions the same.
--- Added SLT functionality
 entity AddSub_32b is 
-    generic(N : integer := 32);
-    port(i_A	  : in std_logic_vector(31 downto 0);
-	 i_B	  : in std_logic_vector(31 downto 0);
-	 nAdd_Sub : in std_logic_vector(1 downto 0);
-	 o_Result : out std_logic_vector(31 downto 0);
-	 o_CarryOut : out std_logic);
+	generic(N : integer := 32);
+	port(i_A        : in std_logic_vector(N-1 downto 0);
+		 i_B        : in std_logic_vector(N-1 downto 0);
+		 nAdd_Sub   : in std_logic_vector(1 downto 0);
+		 o_Result   : out std_logic_vector(N-1 downto 0);
+		 o_CarryOut : out std_logic);
 end AddSub_32b;
 
-architecture structural of AddSub_32b is
-    component OnesComp is
-	port(i_A	: in std_logic_vector(31 downto 0);
-	     o_O	: out std_logic_vector(31 downto 0));
-    end component;
-
-    component mux2t1_N is
-	generic(N : integer := 32);
-	port(i_S          : in std_logic;
-       	     i_D0         : in std_logic_vector(31 downto 0);
-             i_D1         : in std_logic_vector(31 downto 0);
-             o_O          : out std_logic_vector(31 downto 0));
-    end component;
-
-    component Adder_N is
-	port(i_A		: in std_logic_vector(31 downto 0);
-             i_B		: in std_logic_vector(31 downto 0);
-	     i_CarryIn	      	: in std_logic;
-	     o_Sum		: out std_logic_vector(31 downto 0);
-	     o_CarryOut		: out std_logic);
-    end component;
-
-    signal s_Inverter 	: std_logic_vector(31 downto 0);
-    signal s_MUX	: std_logic_vector(31 downto 0);
-    signal s_nAdd_Sub	: std_logic;
-    signal s_ResultSign : std_logic;
-
-
+architecture rtl of AddSub_32b is
+	signal s_A        : unsigned(N-1 downto 0);
+	signal s_B        : unsigned(N-1 downto 0);
+	signal s_Subtract : std_logic;
+	signal s_ExtA     : unsigned(N downto 0);
+	signal s_ExtB     : unsigned(N downto 0);
+	signal s_Sum      : unsigned(N downto 0);
 begin
+	s_A        <= unsigned(i_A);
+	s_B        <= unsigned(i_B);
+	s_Subtract <= '1' when nAdd_Sub = "01" else '0';
 
-    with nAdd_Sub select s_nAdd_Sub
-	<= '0' when "00",
-	'1' when others;
+	s_ExtA <= ('0' & s_A);
+	s_ExtB <= ('0' & (not s_B)) when s_Subtract = '1' else ('0' & s_B);
 
-    g_Inverter : OnesComp
-	port map(i_A	=> i_B,
-		 o_O	=> s_Inverter);
-
-    g_MUX : mux2t1_N
-	port map(i_S	=> s_nAdd_Sub,
-		 i_D0	=> i_B,
-		 i_D1	=> s_Inverter,
-		 o_O	=> s_MUX);
-
-    g_Adder : Adder_N
-	port map(i_A		=> i_A,
-		 i_B		=> s_MUX,
-		 i_CarryIn   	=> s_nAdd_Sub,
-		 o_Sum		=> o_Result,
-		 o_CarryOut	=> o_CarryOut);
-
-    s_ResultSign <= o_Result(31);
-
--- SLT / SLTU implementation
-    process(nAdd_Sub, s_ResultSign)
+	process(s_ExtA, s_ExtB, s_Subtract)
+		variable v_sum : unsigned(N downto 0);
 	begin
-	if (nAdd_Sub = "10") then -- if SLT is selected
-	    o_Result(31 downto 1) <= (others => '0');
-	    o_Result(0) <= s_ResultSign;
+		if s_Subtract = '1' then
+			v_sum := s_ExtA + s_ExtB + 1;
+		else
+			v_sum := s_ExtA + s_ExtB;
+		end if;
+		s_Sum <= v_sum;
+	end process;
 
-	elsif (nAdd_Sub = "11") then -- if SLTU is selected
-	    o_Result(31 downto 1) <= (others => '0');
-	    o_Result(0) <= NOT o_CarryOut;
-  	
-	end if;
-    end process;
-
-end structural;
+	o_Result   <= std_logic_vector(s_Sum(N-1 downto 0));
+	o_CarryOut <= s_Sum(N);
+end rtl;
 
 
 

@@ -17,6 +17,7 @@
 
 library IEEE;
 use IEEE.std_logic_1164.all;
+use IEEE.numeric_std.all;
 
 library work;
 use work.RISCV_types.all;
@@ -28,7 +29,7 @@ entity RISCV_Processor is
        iInstLd         : in std_logic;
        iInstAddr       : in std_logic_vector(N-1 downto 0);
        iInstExt        : in std_logic_vector(N-1 downto 0);
-       oALUOut         : out std_logic_vector(N-1 downto 0)); -- Hook this up to the output of the ALU. It is important for synthesis that you have this output that can effectively be impacted by all other components so they are not optimized away.
+       oALUOut         : out std_logic_vector(N-1 downto 0)); -- TODO: Hook this up to the output of the ALU. It is important for synthesis that you have this output that can effectively be impacted by all other components so they are not optimized away.
 
 end  RISCV_Processor;
 
@@ -36,10 +37,10 @@ end  RISCV_Processor;
 architecture structure of RISCV_Processor is
 
   -- Required data memory signals
-  signal s_DMemWr       : std_logic; -- use this signal as the final active high data memory write enable signal
-  signal s_DMemAddr     : std_logic_vector(N-1 downto 0); -- use this signal as the final data memory address input
-  signal s_DMemData     : std_logic_vector(N-1 downto 0); -- use this signal as the final data memory data input
-  signal s_DMemOut      : std_logic_vector(N-1 downto 0); -- use this signal as the data memory output
+  signal s_DMemWr       : std_logic; -- TODO: use this signal as the final active high data memory write enable signal
+  signal s_DMemAddr     : std_logic_vector(N-1 downto 0); -- TODO: use this signal as the final data memory address input
+  signal s_DMemData     : std_logic_vector(N-1 downto 0); -- TODO: use this signal as the final data memory data input
+  signal s_DMemOut      : std_logic_vector(N-1 downto 0); -- TODO: use this signal as the data memory output
  
   -- Required register file signals 
   signal s_RegWr        : std_logic; -- use this signal as the final active high write enable input to the register file
@@ -72,39 +73,41 @@ architecture structure of RISCV_Processor is
   --       requires below this comment
   -- SIGNALS AND COMPONENTS:
 
-    signal s_PCInput : std_logic_vector(31 downto 0); -- Signal to be used as the PC's input (after it comes out of the PCSrc MUX)
-    signal s_Plus4Adder_COut : std_logic; -- Plus4Adder's Carry Out output
-    signal s_Plus4Adder : std_logic_vector(31 downto 0);
-    signal s_ShiftedImm : std_logic_vector(31 downto 0); -- Signal of the immediate after being extended and shifted left by 1 bit
-    signal s_BranchCOut : std_logic; -- BranchingAdder's Carry Out
-    signal s_BranchingAdder : std_logic_vector(31 downto 0);
-    signal s_ImmType : std_logic_vector(2 downto 0); -- Signal from the Control Unit to select the Extender's behavior
-    signal s_Extender : std_logic_vector(31 downto 0);
-    signal s_PCSrc : std_logic; -- OR gate output of s_ANDgate and Control Unit's Jump output
-    signal s_PCSrc_MUX : std_logic_vector(31 downto 0);
-    signal s_ReadData1 : std_logic_vector(31 downto 0);
-    signal s_ReadData2 : std_logic_vector(31 downto 0);
-    signal s_Branch : std_logic;
-    signal s_Jump : std_logic;
-    signal s_MemRead : std_logic;
-    signal s_MemToReg : std_logic;
-    signal s_AndLink : std_logic;
-    signal s_ALUSrc : std_logic;
-    signal s_ALUControl : std_logic_vector(3 downto 0);
-    signal s_ANDgate : std_logic; -- AND gate of Control Unit's Branch output and ALU's Zero output
-    signal s_Zero : std_logic;
-    signal s_ALUSrc_MUX : std_logic_vector(31 downto 0); -- Signal output from ALUSrc's MUX
-    signal s_AndLink_MUX : std_logic_vector(31 downto 0);
+  signal s_PCInput : std_logic_vector(N-1 downto 0);
+  signal s_Plus4Adder : std_logic_vector(N-1 downto 0);
+  signal s_ShiftedImm : std_logic_vector(N-1 downto 0);
+  signal s_BranchingAdder : std_logic_vector(N-1 downto 0);
+  signal s_ImmType : std_logic_vector(2 downto 0);
+  signal s_Extender : std_logic_vector(N-1 downto 0);
+  signal s_PCSrc : std_logic;
+  signal s_PCSrc_MUX : std_logic_vector(N-1 downto 0);
+  signal s_ReadData1 : std_logic_vector(N-1 downto 0);
+  signal s_ReadData2 : std_logic_vector(N-1 downto 0);
+  signal s_Branch : std_logic;
+  signal s_Jump : std_logic;
+  signal s_MemRead : std_logic;
+  signal s_MemToReg : std_logic;
+  signal s_AndLink : std_logic;
+  signal s_ALUSrc : std_logic;
+  signal s_ALUControl : std_logic_vector(3 downto 0);
+  signal s_ALUInputA : std_logic_vector(N-1 downto 0);
+  signal s_ALUResult : std_logic_vector(N-1 downto 0);
+  signal s_ALUInputB : std_logic_vector(N-1 downto 0);
+  signal s_WriteBack : std_logic_vector(N-1 downto 0);
+  signal s_LinkData : std_logic_vector(N-1 downto 0);
+  signal s_JumpTarget : std_logic_vector(N-1 downto 0);
+  signal s_ALUZero : std_logic;
+  signal s_Shamt    : std_logic_vector(4 downto 0);
+  signal s_AUIPC    : std_logic;
 
-
-
-    component AddSub is
-	port(i_A	: in std_logic_vector(31 downto 0);
-	     i_B	: in std_logic_vector(31 downto 0);
-	     nAdd_Sub	: in std_logic;
-	     o_Result	: out std_logic_vector(31 downto 0);
-	     o_CarryOut	: out std_logic);
-    end component;
+  component AddSub_32b is
+    generic(N : integer := 32);
+    port(i_A      : in std_logic_vector(N-1 downto 0);
+       i_B      : in std_logic_vector(N-1 downto 0);
+       nAdd_Sub : in std_logic_vector(1 downto 0);
+       o_Result : out std_logic_vector(N-1 downto 0);
+       o_CarryOut : out std_logic);
+  end component;
 
     component mux2to1_32b is
 	port(i_A	: in std_logic_vector(31 downto 0);
@@ -121,11 +124,19 @@ architecture structure of RISCV_Processor is
 	 	o_Q	: out std_logic_vector(31 downto 0));
     end component;
 
-    component Extender is
-    	port(    i_Inst	: in std_logic_vector(31 downto 0);
-		 i_Sel	: in std_logic_vector(2 downto 0);
-		 o_Out	: out std_logic_vector(31 downto 0));
-    end component;
+  component Extender is
+    port( i_Inst : in std_logic_vector(31 downto 0);
+        i_Sel  : in std_logic_vector(2 downto 0);
+        o_Out  : out std_logic_vector(31 downto 0));
+  end component;
+
+  component ALU is
+    port(i_A        : in  std_logic_vector(31 downto 0);
+       i_B        : in  std_logic_vector(31 downto 0);
+       i_ALUControl : in  std_logic_vector(3 downto 0);
+       i_shamt    : in  std_logic_vector(4 downto 0);
+       o_ALUOut   : out std_logic_vector(31 downto 0));
+  end component;
 
     component RegisterFile is
 	port(	i_CLK        : in  std_logic;
@@ -155,15 +166,6 @@ architecture structure of RISCV_Processor is
         o_RegWrite   : out std_logic;
         o_ImmType    : out std_logic_vector(2 downto 0);
         o_ALUControl : out std_logic_vector(3 downto 0));
-    end component;
-
-    component ALU is
-	port(i_A	  : in std_logic_vector(31 downto 0);
-	     i_B   	  : in std_logic_vector(31 downto 0);
-	     i_ALUControl : in std_logic_vector(3 downto 0);
-	     i_shamt      : in std_logic_vector(4 downto 0);
-	     o_ALUOut     : out std_logic_vector(31 downto 0);
-	     o_Zero       : out std_logic);
     end component;
 
 
@@ -200,107 +202,98 @@ begin
   -- Implement the rest of your processor below this comment! 
   -- PORT MAPPING:
 
-    ProgramCounter : PC
-	port map(i_CLK	=> iCLK,
-		 i_RST	=> iRST,
-		 i_WE	=> '1',
-		 i_D	=> s_PCInput,
-		 o_Q	=> s_NextInstAddr);
+  ProgramCounter : PC
+    port map(i_CLK => iCLK,
+         i_RST => iRST,
+         i_WE  => '1',
+         i_D   => s_PCInput,
+         o_Q   => s_NextInstAddr);
 
-    Plus4Adder : AddSub
-	port map(i_A	=> s_NextInstAddr,
-		 i_B	=> x"00000004",
-		 nAdd_Sub => '0',
-		 o_CarryOut => s_Plus4Adder_COut,
-		 o_Result => s_Plus4Adder);
+  Plus4Adder : AddSub_32b
+    port map(i_A       => s_NextInstAddr,
+         i_B       => x"00000004",
+         nAdd_Sub  => "00",
+         o_CarryOut=> open,
+         o_Result  => s_Plus4Adder);
 
-    BranchingAdder : AddSub
-	port map(i_A	=> s_NextInstAddr,
-		 i_B	=> s_ShiftedImm,
-		 nAdd_Sub => '0',
-		 o_CarryOut => s_BranchCOut,
-		 o_Result => s_BranchingAdder);
+  BranchingAdder : AddSub_32b
+    port map(i_A       => s_NextInstAddr,
+         i_B       => s_ShiftedImm,
+         nAdd_Sub  => "00",
+         o_CarryOut=> open,
+         o_Result  => s_BranchingAdder);
 
     ImmExtender : Extender
 	port map(i_Inst	=> s_Inst,
 		 i_Sel	=> s_ImmType,
 		 o_Out	=> s_Extender);
 
-    s_ShiftedImm <= s_Extender(30 downto 0) & '0'; -- Shifts Extender output by 1 to the left
+  s_ShiftedImm <= s_Extender(30 downto 0) & '0';
 
     PCSrc_MUX : mux2to1_32b
-	port map(i_A	=> s_Plus4Adder,
-		 i_B	=> s_BranchingAdder,
-		 i_Sel	=> s_PCSrc,
-		 o_Out	=> s_PCSrc_MUX);
+    port map(i_A   => s_Plus4Adder,
+         i_B   => s_BranchingAdder,
+         i_Sel => s_PCSrc,
+         o_Out => s_PCSrc_MUX);
 
-    -- s_RegWr instead of s_RegWrite, s_DMemWr instead of s_MemWrite
     Control : ControlUnit
-	port map(i_Opcode	=> s_Inst(6 downto 0),
-		 i_funct3	=> s_Inst(14 downto 12),
-		 i_funct7	=> s_Inst(31 downto 25),
-		 o_Branch	=> s_Branch,
-		 o_Jump		=> s_Jump,
-		 o_MemRead	=> s_MemRead,
-		 o_MemToReg	=> s_MemToReg,
-		 o_MemWrite	=> s_DMemWr,
-		 o_AndLink	=> s_AndLink,
-		 o_ALUSrc	=> s_ALUSrc,
-		 o_RegWrite	=> s_RegWr,
-		 o_ImmType	=> s_ImmType,
-		 o_ALUControl	=> s_ALUControl);
-		 
+    port map(i_Opcode    => s_Inst(6 downto 0),
+         i_funct3    => s_Inst(14 downto 12),
+         i_funct7    => s_Inst(31 downto 25),
+         o_Branch    => s_Branch,
+         o_Jump      => s_Jump,
+         o_MemRead   => s_MemRead,
+         o_MemToReg  => s_MemToReg,
+         o_MemWrite  => s_DMemWr,
+         o_AndLink   => s_AndLink,
+         o_ALUSrc    => s_ALUSrc,
+         o_RegWrite  => s_RegWr,
+         o_ImmType   => s_ImmType,
+         o_ALUControl=> s_ALUControl);
+
+  s_Shamt <= s_Inst(24 downto 20);
+  s_ALUInputB <= s_Extender when s_ALUSrc = '1' else s_ReadData2;
+
+  ALU_inst : ALU
+    port map(i_A         => s_ALUInputA,
+         i_B         => s_ALUInputB,
+         i_ALUControl=> s_ALUControl,
+         i_shamt     => s_Shamt,
+         o_ALUOut    => s_ALUResult);
+
+  s_ALUZero <= '1' when s_ALUResult = (others => '0') else '0';
 
     s_RegWrAddr <= s_Inst(11 downto 7);
 
     g_RegisterFile : RegisterFile
-	port map(i_CLK		=> iCLK,
-		 i_RST		=> iRST,
-		 i_RegWrite	=> s_RegWr,
-		 i_ReadReg1	=> s_Inst(19 downto 15),
-		 i_ReadReg2	=> s_Inst(24 downto 20),
-		 i_WriteReg	=> s_RegWrAddr,
-		 i_WriteData	=> s_RegWrData,
-		 o_ReadData1	=> s_ReadData1,
-		 o_ReadData2	=> s_ReadData2);
+    port map(i_CLK       => iCLK,
+         i_RST       => iRST,
+         i_RegWrite  => s_RegWr,
+         i_ReadReg1  => s_Inst(19 downto 15),
+         i_ReadReg2  => s_Inst(24 downto 20),
+         i_WriteReg  => s_RegWrAddr,
+         i_WriteData => s_RegWrData,
+         o_ReadData1 => s_ReadData1,
+         o_ReadData2 => s_ReadData2);
 
-    ALUSrc_MUX : mux2to1_32b
-	port map(i_A	=> s_ReadData2,
-		 i_B	=> s_Extender,
-		 i_Sel	=> s_ALUSrc,
-		 o_Out	=> s_ALUSrc_MUX);
+  s_AUIPC     <= '1' when s_Inst(6 downto 0) = "0010111" else '0';
+  s_ALUInputA <= s_NextInstAddr when s_AUIPC = '1' else s_ReadData1;
 
-    ALU_Component : ALU
-	port map(i_A		=> s_ReadData1,
-		 i_B		=> s_ALUSrc_MUX,
-		 i_ALUControl	=> s_ALUControl,
-		 i_shamt	=> s_Inst(24 downto 20),
-		 o_ALUOut	=> oALUOut,
-		 o_Zero		=> s_Zero);
+  s_PCSrc      <= s_Branch and s_ALUZero;
+  s_PCInput    <= s_JumpTarget when s_Jump = '1' else s_PCSrc_MUX;
+  s_JumpTarget <= s_BranchingAdder when (s_Jump = '1' and s_ALUSrc = '0') else s_ALUResult;
+  s_LinkData   <= s_Plus4Adder;
 
-    s_ANDgate <= s_Branch AND s_Zero;
+  s_WriteBack <= s_DMemOut when s_MemToReg = '1' else s_ALUResult;
+  s_RegWrData <= s_LinkData when s_AndLink = '1' else s_WriteBack;
 
-    s_PCSrc <= s_ANDgate OR s_Jump;
+  s_DMemAddr <= s_ALUResult;
+  s_DMemData <= s_ReadData2;
 
-    -- DMem signals:
-    s_DMemAddr	<= oALUOut;
-    s_DMemData	<= s_ReadData2;
+  oALUOut <= s_ALUResult;
 
-    AndLink_MUX : mux2to1_32b
-	port map(i_A	=> oALUOut,
-		 i_B	=> s_Plus4Adder,
-		 i_Sel	=> s_AndLink,
-		 o_Out	=> s_AndLink_MUX);
-
-    MemToReg_MUX : mux2to1_32b
-	port map(i_A	=> s_AndLink_MUX,
-		 i_B	=> s_DMemOut,
-		 i_Sel	=> s_MemToReg,
-		 o_Out	=> s_RegWrData);
-    
-
-    
-
+  s_Halt <= '0';
+  s_Ovfl <= '0';
 
 end structure;
 

@@ -27,7 +27,7 @@ begin
     PC_Reg : NBitRegister
 	port map(i_CLK	=> i_CLK,
 		 i_RST	=> i_RST,
-		 i_WE	=> '1',
+		 i_WE	=> i_WE,
 		 i_D	=> i_D,
 		 o_Q	=> o_Q);
 
