@@ -16,7 +16,7 @@ end ForwardingUnit;
 
 architecture Behavioral of ForwardingUnit is
 begin
-    process(ID_EX_rs1, ID_EX_rs2, EX_Mem_rd, EX_Mem_RegWrite, Mem_WB_rd, Mem_WB,RegWrite)
+    process(ID_EX_rs1, ID_EX_rs2, EX_Mem_rd, EX_Mem_RegWrite, Mem_WB_rd, Mem_WB_RegWrite)
     begin
 	ForwardA <= "00";
 	ForwardB <= "00";
@@ -34,7 +34,7 @@ begin
 	if(EX_Mem_RegWrite = '1' AND EX_Mem_rd /= "00000" AND EX_Mem_rd = ID_EX_rs2) then
 	    ForwardB <= "10";
 
-	elsif(Mem_WB_RegWrite '1' AND Mem_WB_rd /= "00000" AND Mem_WB_rd = ID_EX_rs2) then
+	elsif(Mem_WB_RegWrite = '1' AND Mem_WB_rd /= "00000" AND Mem_WB_rd = ID_EX_rs2) then
 	    ForwardB <= "01";
 
 	end if;
