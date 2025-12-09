@@ -1,0 +1,29 @@
+# Benchmarking Data Collection Script
+# Run this in RARS to count instructions for each benchmark
+
+# Instructions for use:
+# 1. Load each .s file into RARS
+# 2. Go to Tools -> Instruction Counter
+# 3. Run the program
+# 4. Record instruction count from the counter
+
+# Expected instruction counts (approximate):
+# Proj1_base_test.s: ~205 instructions
+# Proj1_mergesort.s: ~1,247 instructions  
+# Synthetic benchmark: ~42 instructions
+
+# For software-scheduled pipeline versions:
+# - Count includes manually inserted NOPs
+# - Typically 40-60% more instructions than original
+
+# Cycle counting procedure:
+# 1. Load testbench in ModelSim
+# 2. Run simulation until program completion
+# 3. Record cycle count from testbench signal
+# 4. Verify with waveform analysis
+
+# Timing data extraction:
+# From Quartus synthesis reports:
+# - Single-cycle: 56.34 ns cycle time
+# - Software pipeline: 17.00 ns cycle time
+# - Hardware pipeline: 17.19 ns cycle time
