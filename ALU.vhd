@@ -109,25 +109,8 @@ begin
     s_SLT_Result <= x"00000001" when (s_A_signed < s_B_signed) else x"00000000";
     s_SLTU_Result <= x"00000001" when (s_A_unsigned < s_B_unsigned) else x"00000000";
 
-    -- Overflow is only meaningful for signed add/sub operations.
-    process(i_ALUControl, i_A, i_B, s_AddSub_Result)
-    begin
-        if i_ALUControl = ALU_ADD then
-            if (i_A(31) = i_B(31)) and (s_AddSub_Result(31) /= i_A(31)) then
-                s_Overflow <= '1';
-            else
-                s_Overflow <= '0';
-            end if;
-        elsif i_ALUControl = ALU_SUB then
-            if (i_A(31) /= i_B(31)) and (s_AddSub_Result(31) /= i_A(31)) then
-                s_Overflow <= '1';
-            else
-                s_Overflow <= '0';
-            end if;
-        else
-            s_Overflow <= '0';
-        end if;
-    end process;
+    -- RISC-V arithmetic is modulo 2^32, so no explicit overflow reporting is required.
+    s_Overflow <= '0';
 
     -- Output multiplexer
     process(i_ALUControl, s_AddSub_Result, s_Logic_Result, s_Shift_Result, s_SLT_Result, s_SLTU_Result, i_B)
